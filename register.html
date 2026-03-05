@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Đăng ký học viên - Toukutei 2</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #f1f5f9; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .register-card { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 100%; max-width: 400px; }
+        h2 { text-align: center; color: #1e40af; margin-bottom: 20px; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-size: 14px; color: #64748b; }
+        input, select { width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; font-family: inherit; }
+        .btn-register { width: 100%; padding: 12px; background: #1e40af; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+        .btn-register:hover { background: #1e3a8a; }
+        .login-link { text-align: center; margin-top: 15px; font-size: 13px; }
+        .login-link a { color: #1e40af; text-decoration: none; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="register-card">
+    <h2>Đăng Ký Thành Viên</h2>
+    <div class="form-group">
+        <label>Họ và tên</label>
+        <input type="text" id="reg-name" placeholder="Nhập tên của bạn">
+    </div>
+
+    <div class="form-group">
+        <label>Bạn thuộc nhóm nào?</label>
+        <select id="reg-group">
+            <option value="1">Nhóm 1 (Lý thuyết + Thực hành G1)</option>
+            <option value="2">Nhóm 2 (Lý thuyết + Thực hành G2)</option>
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label>Email</label>
+        <input type="email" id="reg-email" placeholder="example@gmail.com">
+    </div>
+    <div class="form-group">
+        <label>Mật khẩu</label>
+        <input type="password" id="reg-password" placeholder="Tối thiểu 6 ký tự">
+    </div>
+    <button class="btn-register" id="btn-submit">Đăng ký ngay</button>
+
+    <div class="login-link">
+        Đã có tài khoản? <a href="login.html">Đăng nhập</a>
+    </div>
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getAuth, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+    import { getFirestore, doc, setDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyALblbqW_VrZh2r7sPJ8Q6XT2fGbk0dsFg",
+        authDomain: "donghung-3208d.firebaseapp.com",
+        projectId: "donghung-3208d",
+        storageBucket: "donghung-3208d.firebasestorage.app",
+        messagingSenderId: "753379492663",
+        appId: "1:753379492663:web:baff34f2c0bac00e02d0b2"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    document.getElementById('btn-submit').addEventListener('click', async () => {
+        const name = document.getElementById('reg-name').value;
+        const email = document.getElementById('reg-email').value;
+        const password = document.getElementById('reg-password').value;
+        
+        // VỊ TRÍ CHÈN 2: Lấy giá trị nhóm đã chọn
+        const group = document.getElementById('reg-group').value;
+
+        if (!name || !email || !password) {
+            alert("Vui lòng điền đầy đủ thông tin!");
+            return;
+        }
+
+        try {
+            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+            const user = userCredential.user;
+
+            // VỊ TRÍ CHÈN 3: Đưa thông tin group vào Firestore
+            await setDoc(doc(db, "users", user.uid), {
+                name: name,
+                email: email,
+                group: group,             // Lưu số nhóm (1 hoặc 2)
+                status: "active",
+                isPremium: false,
+                device_count: 0,
+                devices: {},
+                exam_progress: {
+                    doboku: 0,
+                    kenchiku: 0
+                },
+                createdAt: new Date().toISOString()
+            });
+
+            alert("Đăng ký thành công! Bạn có thể học thử 90 câu miễn phí.");
+            window.location.href = "index.html";
+
+        } catch (error) {
+            console.error("Lỗi đăng ký:", error);
+            let msg = "Lỗi không xác định.";
+            if (error.code === 'auth/email-already-in-use') msg = "Email này đã được đăng ký!";
+            if (error.code === 'auth/weak-password') msg = "Mật khẩu quá yếu (tối thiểu 6 ký tự)!";
+            alert(msg);
+        }
+    });
+</script>
+</body>
+</html>

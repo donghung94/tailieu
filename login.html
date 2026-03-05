@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Đăng nhập – Toukutei Gino 2</title>
+    <link rel="icon" href="icon-192.png" /> 
+    <style>
+       body { margin: 0; background: #f8fafc; font-family: sans-serif; }
+    .wrapper { max-width: 420px; margin: 20px auto; padding: 10px; }
+    .warning-box { background: #fff3f3; border: 2px solid #ff4d4d; border-radius: 12px; padding: 15px; margin-bottom: 16px; text-align: center; }
+    .warning-box h1 { color: #d90000; font-size: 18px; margin-bottom: 8px; }
+    .warning-box p { font-size: 14px; line-height: 1.5; }
+    .login-box { background: #fff; padding: 22px; border-radius: 12px; box-shadow: 0 10px 30px rgba(2,6,23,.12); text-align: center; }
+    .login-box img { width: 80px; border-radius: 12px; margin-bottom: 10px; }
+    .login-box input { width: 100%; padding: 10px 12px; margin: 8px 0; border: 1px solid #e5e7eb; border-radius: 8px; }
+    .login-box button { width: 100%; padding: 10px; border: none; border-radius: 8px; background: #1e40af; color: #fff; font-weight: 600; margin-top: 8px; }
+    .note { margin-top: 8px; font-size: 12px; color: #6b7280; }
+    </style>
+</head>
+
+<body>
+<div class="wrapper">
+  <div class="warning-box">
+    <h1>⚠️ CẢNH BÁO LỪA ĐẢO</h1>
+    <p>Hiện tại có <a href="https://www.tiktok.com/@tokutegino2xaydung" target="_blank">Link TikTok giả</a> lừa đảo bán app.</p>
+    <p>👉 <b>Lưu ý:</b> KHÔNG chuyển tiền trước – KHÔNG bán app trôi nổi.</p>
+    <p>📩 Học viên mới vui lòng IB <a href="https://www.tiktok.com/@anhphuong19912" target="_blank">TikTok CHÍNH CHỦ</a> để được cấp app.</p>
+    <p><b>❗ Các nick khác đều là giả mạo</b></p>
+  </div>
+    <div class="login-box">
+    <img src="icon-192.png" alt="Logo" />
+        <h2 style="margin:6px 0 12px;font-size:18px; color: #333;">🔒 Đăng nhập Quiz App</h2>
+        <p style="font-size: 13px; color: #666; margin-bottom: 20px;">Luyện thi Kỹ năng đặc định số 2</p>
+
+        <form id="loginForm">
+            <input type="email" id="email" placeholder="Email" required
+                style="width:100%;padding:12px 12px;margin:8px 0;border:1px solid #e5e7eb;border-radius:8px;outline:none;" />
+            
+            <input type="password" id="password" placeholder="Mật khẩu" required
+                style="width:100%;padding:12px 12px;margin:8px 0;border:1px solid #e5e7eb;border-radius:8px;outline:none;" />
+
+            <button type="submit" id="loginBtn">Đăng nhập</button>
+        </form>
+
+        <p id="message" style="margin-top:12px;font-size:14px;min-height:18px; line-height: 1.4;"></p>
+
+        <div style="margin-top:15px;font-size:12px;color:#6b7280; border-top: 1px solid #eee; padding-top: 10px;">
+            Lưu ý: Tài khoản chỉ sử dụng tối đa <strong>01 thiết bị</strong>.
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+      const firebaseConfig = {
+            apiKey: "AIzaSyALblbqW_VrZh2r7sPJ8Q6XT2fGbk0dsFg",
+            authDomain: "donghung-3208d.firebaseapp.com",
+            projectId: "donghung-3208d",
+            storageBucket: "donghung-3208d.firebasestorage.app",
+            messagingSenderId: "753379492663",
+            appId: "1:753379492663:web:baff34f2c0bac00e02d0b2"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // --- Cố định ID thiết bị bằng LocalStorage ---
+        function getDeviceId() {
+            let deviceId = localStorage.getItem('my_device_id');
+            if (!deviceId) {
+                // Sử dụng timestamp + chuỗi ngẫu nhiên để ID không bị trùng
+                deviceId = 'dev_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+                localStorage.setItem('my_device_id', deviceId);
+            }
+            return deviceId;
+        }
+
+        function getDeviceName() {
+            const ua = navigator.userAgent;
+            if (ua.includes("iPhone")) return "iPhone";
+            if (ua.includes("Android")) return "Android";
+            if (ua.includes("Win")) return "Windows PC";
+            return "Mobile/Tablet";
+        }
+
+        const emailEl = document.getElementById("email");
+        const passEl  = document.getElementById("password");
+        const btn      = document.getElementById("loginBtn");
+        const msg      = document.getElementById("message");
+        const loginForm = document.getElementById("loginForm");
+
+        loginForm.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const email = emailEl.value.trim();
+            const password = passEl.value.trim();
+            const currentDeviceId = getDeviceId();
+            const currentDeviceName = getDeviceName();
+
+            msg.textContent = "⏳ Đang kiểm tra...";
+            msg.style.color = "#1e40af"; 
+            btn.disabled = true;
+
+            try {
+                const userCredential = await signInWithEmailAndPassword(auth, email, password);
+                const user = userCredential.user;
+
+                const userDocRef = doc(db, "users", user.uid);
+                const userSnap = await getDoc(userDocRef);
+
+                if (!userSnap.exists()) {
+                    // TRƯỜNG HỢP 1: TÀI KHOẢN MỚI TINH (Chưa có trong Firestore)
+                    const initialData = {
+                        name: user.displayName || "Học viên",
+                        email: user.email,
+                        device_count: 1, // Ghi nhận 1 máy ngay
+                        devices: {
+                            [currentDeviceId]: {
+                                name: currentDeviceName,
+                                addedAt: serverTimestamp(),
+                                last_login: serverTimestamp()
+                            }
+                        },
+                        status: "active",
+                        createdAt: serverTimestamp()
+                    };
+                    await setDoc(userDocRef, initialData);
+                } else {
+                    // TRƯỜNG HỢP 2: ĐÃ CÓ HỒ SƠ
+                    const userData = userSnap.data();
+                    if (userData.status === 'banned') {
+                        await signOut(auth);
+                        throw new Error("Tài khoản đã bị khóa.");
+                    }
+
+                    const devices = userData.devices || {};
+                    const deviceCount = userData.device_count || 0;
+
+                    if (devices[currentDeviceId]) {
+                        // A. Nếu là máy cũ -> Cập nhật giờ đăng nhập
+                        await updateDoc(userDocRef, {
+                            [`devices.${currentDeviceId}.last_login`]: serverTimestamp()
+                        });
+                    } else {
+                        // B. Nếu là máy mới hoàn toàn
+                        if (deviceCount >= 1) { 
+                            // Chặn ngay vì đã đủ 1 máy
+                            await signOut(auth);
+                            throw new Error("🚫 Tài khoản chỉ được sử dụng trên 1 thiết bị. Vui lòng liên hệ Admin để Reset.");
+                        } else {
+                            // Chưa có máy nào (do admin reset) -> Cho phép đăng ký máy này
+                            await updateDoc(userDocRef, {
+                                [`devices.${currentDeviceId}`]: {
+                                    name: currentDeviceName,
+                                    addedAt: serverTimestamp(),
+                                    last_login: serverTimestamp()
+                                },
+                                device_count: 1 // Ghi đè thành 1
+                            });
+                        }
+                    }
+                }
+
+                msg.textContent = "✅ Đăng nhập thành công!";
+                msg.style.color = "green";
+                setTimeout(() => location.href = "index.html", 500);
+
+            } catch (err) {
+                let text = err.message;
+                if (err.code === 'auth/invalid-credential') text = "Sai email hoặc mật khẩu.";
+                msg.textContent = "❌ " + text;
+                msg.style.color = "#ef4444";
+                btn.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>

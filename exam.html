@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Quiz APP luyện thi toukuteigino2 xây dựng cấp tốc</title>
+  <link rel="icon" href="icon-192.png">
+  <meta name="theme-color" content="#ffffff">
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="firebase.js"></script>
+</head>
+
+<body class="mono">
+  <!-- 🔐 Kiểm tra đăng nhập -->
+<script type="module">
+    import { auth, db } from "./firebase.js"; 
+    import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
+    import { doc, getDoc } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+
+    onAuthStateChanged(auth, async (user) => {
+        if (!user) {
+            location.href = "login.html";
+        } else {
+            try {
+                const userDocRef = doc(db, "users", user.uid);
+                const userSnap = await getDoc(userDocRef);
+
+                if (userSnap.exists()) {
+                    const data = userSnap.data();
+                    const isPremium = data.isPremium === true; // Kiểm tra quyền Premium
+                    const currentDeviceId = localStorage.getItem('my_device_id');
+                    const devices = data.devices || {};
+
+                    // 1. KIỂM TRA THIẾT BỊ
+                    if (data.device_count >= 1 && !devices[currentDeviceId]) {
+                        alert("🚫 Thiết bị không hợp lệ hoặc đã bị đổi. Bạn sẽ bị đăng xuất.");
+                        await signOut(auth);
+                        location.href = "login.html";
+                        return;
+                    }
+
+                    // 2. LOGIC CHẶN TRUY CẬP PREMIUM
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const setNum = urlParams.get('set');
+                    const practice = urlParams.get('practice');
+                    
+                    // Danh sách cho phép: questions.js (set=1), questions2.js (set=2), questions3.js (set=3)
+                    const allowedSets = ['1', '2', '3']; 
+
+                    if (!isPremium) {
+                        // Nếu truy cập các set > 3 HOẶC bất kỳ bài thi thử/thực hành nào (practice)
+                        if ((setNum && !allowedSets.includes(setNum)) || practice || setNum === 'randomExam') {
+                            
+                            // Hiển thị Modal khóa
+                            const modal = document.getElementById('premium-modal');
+                            if (modal) {
+                                modal.style.display = 'flex';
+                                // Ẩn nội dung câu hỏi để học viên không nhìn thấy phía sau
+                                document.querySelector('main.container').style.display = 'none';
+                                document.getElementById('timer').innerText = "🔒 Khóa";
+                            }
+                            return; // Dừng không cho chạy code load câu hỏi ở exam.js
+                        }
+                    }
+
+                    // 3. HIỂN THỊ TÊN (Nếu hợp lệ)
+                    const nameDisplay = document.getElementById('user-display-name');
+                    if (nameDisplay) {
+                        nameDisplay.innerText = data.name || "Học viên";
+                    }
+
+                } else {
+                    console.warn("Không tìm thấy dữ liệu học viên.");
+                }
+            } catch (error) {
+                console.error("Lỗi xác thực tại trang thi:", error);
+            }
+        }
+    });
+</script>
+ <header class="header">
+    <div class="brand small">
+      <img src="icon-192.png" alt="H" class="logo">
+      <div class="titles">
+        <div class="brand-name"> Quiz APP</div>
+        <div class="subtitle">Chào: <span id="user-display-name">...</span></div>
+      </div>
+    </div>
+    <div class="hud">
+      <span id="timer" class="timer">60:00</span>
+      <button id="submitBtn" class="btn">Nộp bài</button>
+      <a href="index.html" class="btn ghost">🏠Trang chủ</a>
+    </div>
+</header>
+   
+  <main class="container">
+    <div id="quiz" class="card"></div>
+    <div id="result" class="card" style="display:none"></div>
+  </main>
+
+  <button id="redoWrong" class="floating">Làm lại những câu sai</button>
+
+  <footer class="footer">© 2025 • Quiz APP CENTER</footer>
+
+  <!-- 🧰 Đề lý thuyết -->
+  <script src="questions.js"></script>
+  <script src="questions2.js"></script>
+  <script src="questions3.js"></script>
+  <script src="questions4.js"></script>
+  <script src="questions5.js"></script>
+  <script src="questions6.js"></script>
+  <script src="questions7.js"></script>
+  <script src="questions8.js"></script>
+  <script src="questions9.js"></script>
+
+  <!-- 🧰 Đề thực hành nhóm 1 -->
+  <script src="practice1_g1.js"></script>
+  <script src="practice2_g1.js"></script>
+  <script src="practice3_g1.js"></script>
+  <script src="practice4_g1.js"></script>
+
+  <!-- 🧰 Đề thực hành nhóm 2 -->
+  <script src="practice1.js"></script>
+  <script src="practice2.js"></script>
+  <script src="practice3.js"></script>
+  <script src="practice4.js"></script>
+
+  <!-- 🧮 Tạo đề ngẫu nhiên -->
+  <script src="exam_random.js"></script>          <!-- random đề lý thuyết -->
+  <script src="practice_random_g1.js"></script>   <!-- random đề thực hành -->
+  <script src="practice_random_g2.js"></script>   <!-- random đề thực hành -->
+
+
+  <!-- ⚙️ Code xử lý chính -->
+  <script src="exam.js"></script>
+
+
+  <!-- 💅 Style nhỏ -->
+  <style>
+    .hud {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .btn.ghost {
+      background: #f3f4f6;
+      color: #1e40af;
+      font-weight: bold;
+      border: 1px solid #1e40af;
+    }
+    .btn.ghost:hover { background: #e0e7ff; }
+  </style>
+  <div id="premium-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:1000; justify-content:center; align-items:center;">
+    <div style="background:white; width:90%; max-width:400px; padding:25px; border-radius:15px; text-align:center; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+        <div style="font-size: 50px; margin-bottom: 15px;">🔒</div>
+        <h2 style="color:#1e40af; margin-bottom: 10px;">Mở Khóa Toàn Bộ</h2>
+        <p style="color:#64748b; font-size:14px; line-height:1.6; margin-bottom:20px;">
+            Bạn đã hoàn thành các câu hỏi miễn phí.<br>
+            Để học tiếp toàn bộ đề , hãy liên hệ Admin để nâng cấp tài khoản Premium. Chỉ <b>499k.VND</b>
+        </p>
+        
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+            <a href="https://zalo.me/09xxxxxxxx" target="_blank" style="background:#0068ff; color:white; padding:12px; border-radius:8px; text-decoration:none; font-weight:bold; display:flex; align-items:center; justify-content:center; gap:10px;">
+                💬 Nhắn tin Zalo Admin
+            </a>
+            <a href="https://facebook.com/yourpage" target="_blank" style="background:#1877f2; color:white; padding:12px; border-radius:8px; text-decoration:none; font-weight:bold; display:flex; align-items:center; justify-content:center; gap:10px;">
+                🔵 Liên hệ Facebook
+            </a>
+            <a href="https://line.me/ti/p/yourid" target="_blank" style="background:#06c755; color:white; padding:12px; border-radius:8px; text-decoration:none; font-weight:bold; display:flex; align-items:center; justify-content:center; gap:10px;">
+                🟢 Kết nối qua Line
+            </a>
+            
+            <button onclick="document.getElementById('premium-modal').style.display='none'" style="margin-top:10px; background:none; border:none; color:#94a3b8; cursor:pointer; font-size:13px;">Để sau</button>
+        </div>
+    </div>
+</div>
+</body>
+</html>

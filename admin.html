@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quản Trị Viên - Toukutei 2</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #f1f5f9; margin: 0; padding: 20px; }
+        .container { max-width: 1200px; margin: auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #eee; padding-bottom: 15px; }
+        .admin-info { background: #eff6ff; padding: 10px 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #2563eb; font-size: 13px; }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th { background: #1e40af; color: white; padding: 12px; text-align: left; }
+        td { padding: 12px; border-bottom: 1px solid #f1f5f9; font-size: 14px; }
+        
+        .btn { padding: 6px 12px; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; color: white; margin-right: 5px; }
+        .btn-reset { background: #f59e0b; }
+        .btn-ban { background: #ef4444; }
+        .btn-unban { background: #10b981; }
+        .btn-premium { background: #8b5cf6; }
+        
+        .status-active { color: #059669; font-weight: bold; }
+        .status-banned { color: #dc2626; font-weight: bold; }
+        .badge-premium { background: #fef3c7; color: #92400e; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: bold; border: 1px solid #f59e0b; }
+        .badge-free { background: #f3f4f6; color: #4b5563; padding: 2px 6px; border-radius: 4px; font-size: 11px; border: 1px solid #d1d5db; }
+        
+        /* Style cho Nhóm */
+        .badge-g1 { background: #dcfce7; color: #166534; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; border: 1px solid #bbf7d0; }
+        .badge-g2 { background: #fef9c3; color: #854d0e; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; border: 1px solid #fef08a; }
+        .group-select { padding: 4px; border-radius: 4px; border: 1px solid #cbd5e1; font-size: 12px; margin-top: 5px; cursor: pointer; }
+        
+        .device-id { font-family: monospace; font-size: 11px; background: #eee; padding: 2px 4px; display: block; margin-top: 4px; color: #666; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h2>Quản Lý Học Viên 海洋（かいよう）土木（どぼく）</h2>
+        <button class="btn" style="background:#64748b" onclick="location.reload()">Làm mới danh sách</button>
+    </div>
+
+    <div class="admin-info" id="current-admin-device">Đang kiểm tra thiết bị...</div>
+
+    <div id="loading" style="text-align:center; padding: 20px;">🚀 Đang lấy dữ liệu từ hệ thống...</div>
+
+    <table id="adminTable" style="display:none;">
+        <thead>
+            <tr>
+                <th>Học viên</th>
+                <th>Phân Nhóm</th>
+                <th>Gói học</th>
+                <th>Thiết bị</th>
+                <th>Trạng thái</th>
+                <th>Thao tác</th>
+            </tr>
+        </thead>
+        <tbody id="userList"></tbody>
+    </table>
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getFirestore, collection, getDocs, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyALblbqW_VrZh2r7sPJ8Q6XT2fGbk0dsFg",
+        authDomain: "donghung-3208d.firebaseapp.com",
+        projectId: "donghung-3208d",
+        storageBucket: "donghung-3208d.firebasestorage.app",
+        messagingSenderId: "753379492663",
+        appId: "1:753379492663:web:baff34f2c0bac00e02d0b2"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const auth = getAuth(app);
+
+    // Hiển thị thiết bị hiện tại
+    const myDeviceId = localStorage.getItem('my_device_id') || "Chưa xác định";
+    document.getElementById('current-admin-device').innerHTML = `Máy quản trị: ${navigator.platform} | ID: ${myDeviceId}`;
+
+    onAuthStateChanged(auth, async (user) => {
+        if (!user) { window.location.href = "login.html"; return; }
+
+        try {
+            const querySnapshot = await getDocs(collection(db, "users"));
+            const userList = document.getElementById('userList');
+            userList.innerHTML = '';
+
+            querySnapshot.forEach((userDoc) => {
+                const data = userDoc.data();
+                const uid = userDoc.id;
+                const userGroup = data.group || "1";
+
+                let deviceIdText = "Trống";
+                if (data.devices) {
+                    const ids = Object.keys(data.devices);
+                    if (ids.length > 0) deviceIdText = ids[0];
+                }
+
+                const row = `
+                    <tr>
+                        <td>
+                            <strong>${data.name || 'N/A'}</strong><br>
+                            <small>${data.email}</small>
+                        </td>
+                        <td>
+                            ${userGroup === '1' ? '<span class="badge-g1">NHÓM 1</span>' : '<span class="badge-g2">NHÓM 2</span>'}<br>
+                            <select class="group-select" onchange="window.changeGroup('${uid}', this.value)">
+                                <option value="1" ${userGroup === '1' ? 'selected' : ''}>Chuyển G1</option>
+                                <option value="2" ${userGroup === '2' ? 'selected' : ''}>Chuyển G2</option>
+                            </select>
+                        </td>
+                        <td>
+                            ${data.isPremium ? '<span class="badge-premium">⭐ PREMIUM</span>' : '<span class="badge-free">FREE (90c)</span>'}
+                        </td>
+                        <td>
+                            <b>${data.device_count || 0}/1</b>
+                            <span class="device-id">${deviceIdText}</span>
+                        </td>
+                        <td class="${data.status === 'banned' ? 'status-banned' : 'status-active'}">
+                            ${data.status === 'banned' ? 'Đã khóa' : 'Hoạt động'}
+                        </td>
+                        <td>
+                            <button class="btn btn-premium" onclick="window.togglePremium('${uid}', ${!data.isPremium})">
+                                ${data.isPremium ? 'Hạ cấp' : 'Mở Premium'}
+                            </button>
+                            <button class="btn btn-reset" onclick="window.resetDevice('${uid}')">Reset Máy</button>
+                            <button class="btn ${data.status === 'banned' ? 'btn-unban' : 'btn-ban'}" 
+                                    onclick="window.toggleStatus('${uid}', '${data.status === 'banned' ? 'active' : 'banned'}')">
+                                ${data.status === 'banned' ? 'Mở khóa' : 'Khóa tài khoản'}
+                            </button>
+                        </td>
+                    </tr>
+                `;
+                userList.innerHTML += row;
+            });
+
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('adminTable').style.display = 'table';
+
+        } catch (error) {
+            document.getElementById('loading').innerHTML = "❌ Lỗi: " + error.message;
+        }
+    });
+
+    // --- HÀM XỬ LÝ DỮ LIỆU ---
+
+    window.changeGroup = async (uid, newGroup) => {
+        if (confirm(`Chuyển học viên sang Nhóm ${newGroup}?`)) {
+            try {
+                await updateDoc(doc(db, "users", uid), { group: newGroup });
+                alert("Đã đổi nhóm thành công!");
+                location.reload();
+            } catch (e) { alert("Lỗi: " + e.message); }
+        }
+    };
+
+    window.togglePremium = async (uid, newStatus) => {
+        const text = newStatus ? "CẤP QUYỀN PREMIUM (Mở toàn bộ đề)" : "HỦY QUYỀN PREMIUM (Về bản Free)";
+        if (confirm(text)) {
+            try {
+                await updateDoc(doc(db, "users", uid), { isPremium: newStatus });
+                location.reload();
+            } catch (e) { alert("Lỗi: " + e.message); }
+        }
+    };
+
+    window.resetDevice = async (uid) => {
+        if (confirm("Reset thiết bị? Học viên có thể đăng nhập trên máy mới.")) {
+            try {
+                await updateDoc(doc(db, "users", uid), { device_count: 0, devices: {} });
+                alert("Đã reset!");
+                location.reload();
+            } catch (e) { alert("Lỗi: " + e.message); }
+        }
+    };
+
+    window.toggleStatus = async (uid, newStatus) => {
+        if (confirm("Xác nhận thay đổi trạng thái đăng nhập?")) {
+            try {
+                await updateDoc(doc(db, "users", uid), { status: newStatus });
+                location.reload();
+            } catch (e) { alert("Lỗi: " + e.message); }
+        }
+    };
+</script>
+
+</body>
+</html>

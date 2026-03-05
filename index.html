@@ -1,0 +1,410 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Quiz APP CENTER</title>
+  <link rel="icon" href="icon-192.png">
+  <meta name="theme-color" content="#ffffff">
+  <link rel="stylesheet" href="style.css">
+
+  <script>
+    const quizFiles = [
+      "questions.js","questions2.js","questions3.js",
+      "questions4.js","questions5.js","questions6.js","questions7.js","questions8.js","questions9.js",
+      "practice1.js","practice2.js","practice3.js","practice4.js","practice1_g1.js","practice2_g1.js","practice3_g1.js","practice4_g1.js"
+    ];
+    quizFiles.forEach(f => fetch(f).catch(()=>{}));
+  </script>
+
+  <script type="module" src="firebase.js"></script>
+</head>
+
+<body class="mono">
+
+<script type="module">
+    import { auth, logout, db } from "./firebase.js"; 
+    import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
+    import { doc, getDoc } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+
+    onAuthStateChanged(auth, async (user) => {
+        if (!user) {
+            location.href = "login.html";
+        } else {
+            try {
+                const userDocRef = doc(db, "users", user.uid);
+                const userSnap = await getDoc(userDocRef);
+
+                if (userSnap.exists()) {
+                    const data = userSnap.data();
+                    const currentDeviceId = localStorage.getItem('my_device_id');
+                    const devices = data.devices || {};
+
+                    // 1. Kiểm tra thiết bị
+                    if (data.device_count >= 1 && !devices[currentDeviceId]) {
+                        alert("🚫 Tài khoản chỉ được dùng trên 1 máy.");
+                        await signOut(auth);
+                        location.href = "login.html";
+                        return;
+                    }
+
+                    // 2. Thông tin tài khoản
+                    const isPremium = data.isPremium === true;
+                    const userGroup = data.group || "1";
+                    const allowedSets = ['1', '2', '3'];
+
+                    // 3. Hiển thị Header
+                    const nameDisplay = document.getElementById('user-display-name');
+                    if (nameDisplay) {
+                        const statusBadge = isPremium 
+                            ? `<span style="color: #f59e0b; font-size: 12px;"> [⭐ Premium - G${userGroup}]</span>` 
+                            : `<span style="color: #64748b; font-size: 12px;"> [Học thử]</span>`;
+                        nameDisplay.innerHTML = (data.name || "Học viên") + statusBadge;
+                        document.getElementById('welcome-section').style.setProperty('display', 'flex', 'important');
+                    }
+
+                    // 4. TẠO TIN NHẮN TỰ ĐỘNG & CẬP NHẬT LINK (Sửa icon FB tại đây)
+                    const msg = encodeURIComponent(`Chào Admin, mình là ${data.name || 'Học viên'} (Nhóm ${userGroup}). Mình muốn hỗ trợ về Premium.`);
+                    
+                    // Link cho Footer
+                    if(document.getElementById('zalo-link')) document.getElementById('zalo-link').href = `https://zalo.me/09xxxxxxxx?text=${msg}`;
+                    if(document.getElementById('fb-link')) document.getElementById('fb-link').href = `https://m.me/yourpage?text=${msg}`;
+                    if(document.getElementById('line-link')) document.getElementById('line-link').href = `https://line.me/ti/p/~yourid`;
+
+                    // Link cho Premium Modal (Cập nhật để không bị lỗi)
+                    if(document.getElementById('modal-zalo')) document.getElementById('modal-zalo').href = `https://zalo.me/09xxxxxxxx?text=${msg}`;
+                    if(document.getElementById('modal-fb')) document.getElementById('modal-fb').href = `https://m.me/yourpage?text=${msg}`;
+                    if(document.getElementById('modal-line')) document.getElementById('modal-line').href = `https://line.me/ti/p/~yourid`;
+
+                    // 5. LOGIC KHÓA ĐỀ THI
+                    document.querySelectorAll('.exam-list a').forEach(link => {
+                        const url = new URL(link.href, window.location.origin);
+                        const setParam = url.searchParams.get('set');
+                        const practiceParam = url.searchParams.get('practice');
+                        
+                        let isLocked = false;
+
+                        if (!isPremium) {
+                            if ((setParam && !allowedSets.includes(setParam)) || practiceParam || setParam === 'randomExam') {
+                                isLocked = true;
+                            }
+                        } 
+                        else if (isPremium && practiceParam) {
+                            const requiredG = "g" + userGroup;
+                            if (!practiceParam.includes(requiredG)) {
+                                isLocked = true;
+                            }
+                        }
+
+                        if (isLocked) {
+                            link.classList.add('exam-locked');
+                            link.addEventListener('click', (e) => {
+                                e.preventDefault();
+                                if (!isPremium) {
+                                    document.getElementById('premium-modal').style.display = 'flex';
+                                } else {
+                                    alert(`🔒 Bạn đang thuộc Nhóm ${userGroup}. Đề này dành cho nhóm khác!`);
+                                }
+                            });
+                        }
+                    });
+                }
+            } catch (error) {
+                console.error("Lỗi:", error);
+            }
+        }
+    });
+
+    window.logout = logout;
+</script>
+  
+
+<header class="header">
+  <div class="brand">
+    <img src="icon-192.png" alt="H" class="logo">
+    <div class="titles">
+      <div class="brand-name">Quiz APP</div>
+      <div class="subtitle"><b>Luyện đề toukutei gino2 xây dựng cấp tốc</b></div>
+    </div>
+  </div>
+  <div id="welcome-section" style="padding: 12px 20px; background: #fff; border-bottom: 2px solid #1e40af; display: none; display: flex; justify-content: space-between; align-items: center;">
+    <div>
+      <span style="color: #64748b; font-size: 14px;">Chào bạn, </span>
+      <strong id="user-display-name" style="color: #1e40af; font-size: 16px;">Học viên</strong>
+    </div>
+  
+  </div>
+</header>
+
+<main class="container">
+  </main>
+
+
+<style>
+.logout-btn {
+  background:#ef4444;
+  color:white;
+  border:none;
+  padding:6px 12px;
+  border-radius:6px;
+  font-weight:bold;
+  cursor:pointer;
+}
+.logout-btn:hover { background:#dc2626; }
+/* ... Các style khác giữ nguyên ... */
+</style>
+
+</body>
+</html>
+
+<!-- ============================
+     🎥 VIDEO GIẢNG DẠY
+============================ -->
+<div class="video-section">
+  <h3>🎥 Video giải đề lý thuyết chung</h3>
+  <div class="video-link">
+    <a href="https://drive.google.com/file/d/1pl9RlHkuC-D0YzX4zTw41aE-9_p6ZaJ1/preview" 
+       target="_blank" rel="noopener noreferrer"
+       class="video-btn">▶️ Xem video</a>
+  </div>
+</div>
+
+<div class="video-section">
+  <h3>🎥 Video giải đề lý thuyết chung</h3>
+  <div class="video-link">
+    <a href="https://drive.google.com/file/d/1eTkqleEcCfyMb8GNI7voh6p9hdJwSqoO/preview" 
+       target="_blank" rel="noopener noreferrer"
+       class="video-btn">▶️ Xem video</a>
+  </div>
+</div>
+
+  <div class="video-section">
+  <h3>🎥 Video giải đề thực hành nhóm 1</h3>
+  <div class="video-link">
+    <a href="https://drive.google.com/file/d/1h8wyAfDmRlrgixBKTIgVB32bR2kPtjcA/preview" 
+       target="_blank" rel="noopener noreferrer"
+       class="video-btn">▶️ Xem video</a>
+  </div>
+</div>
+  
+<div class="video-section">
+  <h3>🎥 Video giải đề thực hành nhóm 2</h3>
+  <div class="video-link">
+    <a href="https://drive.google.com/file/d/14-bKR9jRiHn4OdBH2MQ1tU23b8i1VUSE/preview" 
+       target="_blank" rel="noopener noreferrer"
+       class="video-btn">▶️ Xem video</a>
+  </div>
+</div>
+
+<!-- ============================
+     📘 DANH SÁCH ĐỀ THI
+============================ -->
+<main class="container">
+  <div class="card">
+    <h2>Chọn đề thi lý thuyết chung</h2>
+    <ul id="exam-list" class="exam-list">
+      <li><a href="exam.html?set=1">Lý thuyết chung – (問1〜問30)</a></li>
+      <li><a href="exam.html?set=2">Lý thuyết chung – (問31〜問60)</a></li>
+      <li><a href="exam.html?set=3">Lý thuyết chung – (問61〜問90)</a></li>
+      <li><a href="exam.html?set=4">Lý thuyết chung – (問91〜問120)</a></li>
+      <li><a href="exam.html?set=5">Lý thuyết chung – (問121〜問150)</a></li>
+      <li><a href="exam.html?set=6">Lý thuyết chung – (問151〜問180)</a></li>
+      <li><a href="exam.html?set=7">👉 Những câu lý thuyết hay thi phần 1</a></li>
+      <li><a href="exam.html?set=8">👉 Những câu lý thuyết hay thi phần 2</a></li>
+      <li><a href="exam.html?set=9">👉 Câu hỏi cập nhật</a></li>
+      <li><a href="exam.html?set=randomExam" style="font-weight:bold;color:#1e40af;">
+        🎲 Đề thi thử lý thuyết chung đảo ngẫu nhiên
+      </a></li>
+    </ul>
+  </div>
+ <!-- ========================= -->
+  <!-- ✅ KHU ĐỀ THỰC HÀNH NHÓM 1 -->
+  <!-- ========================= -->
+  <div class="card">
+    <h2>🧰 Đề thực hành nhóm 1</h2>
+    <ul class="exam-list">
+      <li><a href="exam.html?practice=g1_1">Thực hành nhóm 1 – (問1〜問30)</a></li>
+      <li><a href="exam.html?practice=g1_2">Thực hành nhóm 1 – (問31〜問60)</a></li>
+      <li><a href="exam.html?practice=g1_3">Thực hành nhóm 1 – (問61〜問90)</a></li>
+      <li><a href="exam.html?practice=g1_4">Thực hành nhóm 1 – (問91〜問132)</a></li>
+      <li><a href="exam.html?practice=g1_random" style="font-weight:bold;color:#1e40af;">🎲 Đề thi thử đảo ngẫu nhiên 40 câu thực hành nhóm 1</a></li>
+    </ul>
+  </div>
+  <!-- ========================= -->
+  <!-- ✅ KHU ĐỀ THỰC HÀNH NHÓM 2 -->
+  <!-- ========================= -->
+  <div class="card">
+    <h2>🧰 Đề thực hành nhóm 2</h2>
+    <ul class="exam-list">
+      <li><a href="exam.html?practice=g2_1">Thực hành nhóm 2 – (問1〜問30)</a></li>
+      <li><a href="exam.html?practice=g2_2">Thực hành nhóm 2 – (問31〜問60)</a></li>
+      <li><a href="exam.html?practice=g2_3">Thực hành nhóm 2 – (問61〜問90)</a></li>
+      <li><a href="exam.html?practice=g2_4">Thực hành nhóm 2 – (問91〜問130)</a></li>
+       <li><a href="exam.html?practice=g2_random" style="font-weight:bold;color:#1e40af;">🎲 Đề thi thử đảo ngẫu nhiên 40 câu thực hành nhóm 2</a></li>
+    </ul>
+  </div>
+</main>
+
+<footer>
+  <div class="admin-contact-section">
+    <p>💡<b> Cần hỗ trợ  </b>? Liên hệ Admin:</p>
+    <div class="contact-icons">
+        <a href="#" id="zalo-link" target="_blank" class="contact-item">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/9/91/Icon_of_Zalo.svg" alt="Zalo">
+            <span>Zalo</span>
+        </a>
+        <a href="#" id="fb-link" target="_blank" class="contact-item">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/0/05/Facebook_Logo_2023.png" alt="FB">
+            <span>Facebook</span>
+        </a>
+        <a href="#" id="line-link" target="_blank" class="contact-item">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/4/41/LINE_logo.svg" alt="Line">
+            <span>Line</span>
+        </a>
+     
+    </div>
+      <div lass="footer">© 2025 • Quiz APP  CENTER</div>
+</div>
+
+</footer>
+
+<!-- 💅 Style bổ sung -->
+<style>
+.logout-btn {
+  background:#ef4444;
+  color:white;
+  border:none;
+  padding:6px 12px;
+  border-radius:6px;
+  font-weight:bold;
+  cursor:pointer;
+}
+.logout-btn:hover { background:#dc2626; }
+
+.video-section {
+  background: #fff;
+  margin: 16px;
+  padding: 16px;
+  border-radius: 10px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+  text-align: center;
+}
+
+.video-btn {
+  display: inline-block;
+  background: #1e40af;
+  color: white;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-weight: bold;
+  text-decoration: none;
+  transition: 0.2s;
+}
+.video-btn:hover { background: #2563eb; }
+
+.exam-list li { list-style:none; margin:8px 0; }
+.exam-list a {
+  display:block;
+  background:#f8fafc;
+  border:1px solid #cbd5e1;
+  padding:10px 14px;
+  border-radius:8px;
+  color:#1e293b;
+  text-decoration:none;
+  transition:.2s;
+}
+.exam-list a:hover { background:#e0e7ff; color:#1e40af; }
+  .admin-contact-section {
+    background: #f8fafc;
+    padding: 20px;
+    margin: 20px 16px;
+    border-radius: 12px;
+    text-align: center;
+    border: 1px dashed #cbd5e1;
+}
+.contact-icons {
+    display: flex;
+    justify-content: center;
+    gap: 25px;
+    margin-top: 15px;
+}
+.contact-item {
+    text-decoration: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    transition: transform 0.2s;
+}
+.contact-item:hover { transform: translateY(-3px); }
+.contact-item img {
+    width: 40px;
+    height: 40px;
+    object-fit: contain;
+}
+.contact-item span {
+    font-size: 12px;
+    font-weight: bold;
+    color: #1e293b;
+}
+.exam-locked {
+    opacity: 0.5 !important;
+    background: #f1f5f9 !important;
+    color: #94a3b8 !important;
+    border: 1px dashed #cbd5e1 !important;
+    cursor: not-allowed !important;
+    position: relative;
+    pointer-events: auto !important; /* Quan trọng: Để vẫn nhận được sự kiện Click hiện thông báo */
+}
+
+.exam-locked::after {
+    content: "🔒 Khóa";
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-35%);
+    background: #64748b;
+    color: white;
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+</style>
+<div id="premium-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:1000; justify-content:center; align-items:center; backdrop-filter: blur(4px);">
+    <div style="background:white; width:90%; max-width:380px; padding:30px; border-radius:20px; text-align:center; box-shadow: 0 20px 40px rgba(0,0,0,0.3); position: relative;">
+        
+        <div style="font-size: 60px; margin-bottom: 10px;">🔒</div>
+        
+        <h2 style="color:#1e40af; margin: 0 0 10px 0; font-size: 22px;">Mở Khóa Toàn Bộ</h2>
+        
+        <p style="color:#64748b; font-size:14px; line-height:1.6; margin-bottom:25px;">
+            Bạn đã hoàn thành các câu hỏi miễn phí.<br>
+            Nâng cấp <b>Premium</b> để học toàn bộ đề thi <br>
+             chỉ với <b>499k (VND)</b>.
+        </p>
+        
+        <div style="display: flex; flex-direction: column; gap: 12px;">
+            <a href="#" id="modal-zalo" target="_blank" style="background:#0068ff; color:white; padding:12px; border-radius:10px; text-decoration:none; font-weight:bold; display:flex; align-items:center; justify-content:center; gap:12px;">
+                <img src="https://upload.wikimedia.org/wikipedia/commons/9/91/Icon_of_Zalo.svg" width="24" height="24" style="border-radius:4px;">
+                Nhắn tin Zalo Admin
+            </a>
+
+            <a href="#" id="modal-fb" target="_blank" style="background:#1877f2; color:white; padding:12px; border-radius:10px; text-decoration:none; font-weight:bold; display:flex; align-items:center; justify-content:center; gap:12px;">
+                <img src="https://upload.wikimedia.org/wikipedia/commons/b/b9/2023_Facebook_icon.svg" width="24" height="24">
+                Liên hệ Facebook
+            </a>
+
+            <a href="#" id="modal-line" target="_blank" style="background:#06c755; color:white; padding:12px; border-radius:10px; text-decoration:none; font-weight:bold; display:flex; align-items:center; justify-content:center; gap:12px;">
+                <img src="https://upload.wikimedia.org/wikipedia/commons/4/41/LINE_logo.svg" width="24" height="24">
+                Kết nối qua Line
+            </a>
+            
+            <button onclick="document.getElementById('premium-modal').style.display='none'" style="margin-top:10px; background:none; border:none; color:#94a3b8; cursor:pointer; font-size:14px; text-decoration: underline;">Để sau</button>
+        </div>
+    </div>
+</div>
+</body>
+</html>
